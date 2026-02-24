@@ -1,0 +1,125 @@
+version: '3.8'
+
+services:
+  # ---- SQLite (default) ----
+  mail-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mail-gateway
+    restart: unless-stopped
+    ports:
+      - '${SMTP_PORT:-2525}:2525'
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=file:/app/data/mail-gateway.db
+      - SMTP_HOST=0.0.0.0
+      - SMTP_PORT=2525
+      - SMTP_ALLOWED_IPS=${SMTP_ALLOWED_IPS:-127.0.0.1}
+      - RELAY_SMTP_HOST=${RELAY_SMTP_HOST:-}
+      - RELAY_SMTP_PORT=${RELAY_SMTP_PORT:-587}
+      - RELAY_SMTP_USER=${RELAY_SMTP_USER:-}
+      - RELAY_SMTP_PASS=${RELAY_SMTP_PASS:-}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - ATTACHMENT_STORAGE_DIR=/app/data/attachments
+      - SMTP_TLS_ENABLED=${SMTP_TLS_ENABLED:-false}
+      - SMTP_TLS_KEY=${SMTP_TLS_KEY:-}
+      - SMTP_TLS_CERT=${SMTP_TLS_CERT:-}
+      - SMTP_TLS_CA=${SMTP_TLS_CA:-}
+      - RATE_LIMIT_MAX=${RATE_LIMIT_MAX:-100}
+      - RATE_LIMIT_WINDOW_MS=${RATE_LIMIT_WINDOW_MS:-60000}
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - mail-data:/app/data
+      - ./certs:/app/certs:ro
+
+  redis:
+    image: redis:7-alpine
+    container_name: mail-gateway-redis
+    restart: unless-stopped
+    ports:
+      - '${REDIS_PORT:-6379}:6379'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  mail-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mail-worker
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=file:/app/data/mail-gateway.db
+      - REDIS_URL=redis://redis:6379
+      - RELAY_SMTP_HOST=${RELAY_SMTP_HOST:-}
+      - RELAY_SMTP_PORT=${RELAY_SMTP_PORT:-587}
+      - RELAY_SMTP_USER=${RELAY_SMTP_USER:-}
+      - RELAY_SMTP_PASS=${RELAY_SMTP_PASS:-}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - ATTACHMENT_STORAGE_DIR=/app/data/attachments
+    volumes:
+      - mail-data:/app/data
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: ['sh', '-c', 'npx prisma migrate deploy && node dist/worker.js']
+
+  mail-gateway-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: mail-gateway-api
+    restart: unless-stopped
+    ports:
+      - '${API_PORT:-3000}:3000'
+    environment:
+      - DATABASE_URL=file:/app/data/mail-gateway.db
+      - API_HOST=0.0.0.0
+      - API_PORT=3000
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    volumes:
+      - mail-data:/app/data
+
+  # ---- PostgreSQL (alternative) ----
+  # Uncomment the sections below to use PostgreSQL instead of SQLite.
+  # Also update DATABASE_URL in the mail-gateway service above.
+  #
+  # mail-gateway:
+  #   environment:
+  #     - DATABASE_URL=postgresql://mailgw:mailgw_secret@postgres:5432/mail_gateway
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #
+  # postgres:
+  #   image: postgres:16-alpine
+  #   container_name: mail-gateway-postgres
+  #   restart: unless-stopped
+  #   environment:
+  #     POSTGRES_DB: mail_gateway
+  #     POSTGRES_USER: mailgw
+  #     POSTGRES_PASSWORD: mailgw_secret
+  #   ports:
+  #     - '5432:5432'
+  #   volumes:
+  #     - pg-data:/var/lib/postgresql/data
+  #   healthcheck:
+  #     test: ['CMD-SHELL', 'pg_isready -U mailgw -d mail_gateway']
+  #     interval: 5s
+  #     timeout: 5s
+  #     retries: 5
+
+volumes:
+  mail-data:
+    driver: local
+  redis-data:
+    driver: local
+  # pg-data:
+  #   driver: local

@@ -1,0 +1,921 @@
+openapi: 3.0.3
+info:
+  title: Mail Gateway API
+  version: "1.0.0"
+  description: |
+    Mail Gateway REST API 스펙입니다. 이 문서는 메일 수신, 분류, 전달 관련 엔드포인트를 정의합니다.
+servers:
+  - url: http://localhost:3000
+    description: 로컬 개발 서버
+paths:
+  /api/health:
+    get:
+      tags:
+        - Health
+      summary: 헬스체크
+      description: 서비스 상태를 확인합니다.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /api/emails:
+    get:
+      tags:
+        - Emails
+      summary: 이메일 목록 (페이지네이션)
+      description: 이메일 목록을 페이지네이션으로 조회합니다.
+      parameters:
+        - name: status
+          in: query
+          description: 이메일 상태 필터
+          schema:
+            type: string
+            enum: [received, classified, forwarded, failed, archived]
+        - name: tenantId
+          in: query
+          description: 테넌트 ID 필터
+          schema:
+            type: string
+            format: uuid
+        - name: page
+          in: query
+          description: 페이지 번호
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: limit
+          in: query
+          description: 페이지 크기
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        '200':
+          description: 이메일 목록
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/EmailSummary'
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+
+  /api/emails/{id}:
+    get:
+      tags:
+        - Emails
+      summary: 이메일 상세
+      description: 이메일 상세 정보, 첨부파일과 전달 로그를 포함합니다.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 이메일 ID (UUID)
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 이메일 상세
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/EmailDetail'
+        '404':
+          description: 이메일을 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Email not found
+
+  /api/tenants:
+    get:
+      tags:
+        - Tenants
+      summary: 테넌트 목록
+      description: 모든 테넌트를 반환합니다.
+      responses:
+        '200':
+          description: 테넌트 목록
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Tenant'
+    post:
+      tags:
+        - Tenants
+      summary: 테넌트 생성
+      description: 새 테넌트를 생성합니다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - domains
+              properties:
+                name:
+                  type: string
+                domains:
+                  type: string
+                  description: >-
+                    JSON 배열 문자열로 전달합니다. 예: ["example.com"]
+                settings:
+                  type: string
+                  nullable: true
+                  description: JSON 문자열
+                enabled:
+                  type: boolean
+                  default: true
+      responses:
+        '201':
+          description: 생성됨
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Tenant'
+        '400':
+          description: 잘못된 요청
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Name is required
+
+  /api/tenants/{id}:
+    get:
+      tags:
+        - Tenants
+      summary: 테넌트 상세
+      description: 테넌트 상세 정보를 반환하며 룰 개수를 포함합니다.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 테넌트 상세
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    allOf:
+                      - $ref: '#/components/schemas/Tenant'
+                      - type: object
+                        properties:
+                          _count:
+                            type: object
+                            properties:
+                              rules:
+                                type: integer
+        '404':
+          description: 테넌트를 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Tenant not found
+    put:
+      tags:
+        - Tenants
+      summary: 테넌트 수정
+      description: 테넌트 정보를 수정합니다. 모든 필드는 선택 가능합니다. settings는 null로 설정해 제거할 수 있습니다.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                domains:
+                  type: string
+                  description: JSON 배열 문자열
+                settings:
+                  type: string
+                  nullable: true
+                enabled:
+                  type: boolean
+      responses:
+        '200':
+          description: 수정됨
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Tenant'
+        '400':
+          description: 잘못된 요청
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        '404':
+          description: 테넌트를 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Tenant not found
+    delete:
+      tags:
+        - Tenants
+      summary: 테넌트 삭제
+      description: 테넌트를 삭제합니다.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 삭제됨
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+        '404':
+          description: 테넌트를 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Tenant not found
+
+  /api/rules:
+    get:
+      tags:
+        - Rules
+      summary: 분류 룰 목록
+      description: 분류 룰 목록을 조회합니다.
+      parameters:
+        - name: tenantId
+          in: query
+          description: 테넌트별 필터
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 룰 목록
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ClassificationRule'
+    post:
+      tags:
+        - Rules
+      summary: 룰 생성
+      description: 새 분류 룰을 생성합니다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, conditions, action]
+              properties:
+                name:
+                  type: string
+                conditions:
+                  type: string
+                  description: JSON 배열 문자열 (RuleCondition[])
+                action:
+                  type: string
+                  enum: [forward, log, archive, reject]
+                description:
+                  type: string
+                  nullable: true
+                priority:
+                  type: integer
+                  default: 0
+                enabled:
+                  type: boolean
+                  default: true
+                forwardTo:
+                  type: string
+                  nullable: true
+                category:
+                  type: string
+                  nullable: true
+                tenantId:
+                  type: string
+                  format: uuid
+                  nullable: true
+      responses:
+        '201':
+          description: 생성됨
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ClassificationRule'
+        '400':
+          description: 잘못된 요청
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+
+  /api/rules/{id}:
+    get:
+      tags:
+        - Rules
+      summary: 룰 상세
+      description: 특정 룰의 상세 정보를 반환합니다.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 룰 상세
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ClassificationRule'
+        '404':
+          description: 룰을 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Rule not found
+    put:
+      tags:
+        - Rules
+      summary: 룰 수정
+      description: 룰을 수정합니다. 모든 필드는 선택 가능합니다.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                conditions:
+                  type: string
+                  description: JSON 배열 문자열
+                action:
+                  type: string
+                  enum: [forward, log, archive, reject]
+                description:
+                  type: string
+                  nullable: true
+                priority:
+                  type: integer
+                enabled:
+                  type: boolean
+                forwardTo:
+                  type: string
+                  nullable: true
+                category:
+                  type: string
+                  nullable: true
+                tenantId:
+                  type: string
+                  format: uuid
+                  nullable: true
+      responses:
+        '200':
+          description: 수정됨
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ClassificationRule'
+        '404':
+          description: 룰을 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Rule not found
+    delete:
+      tags:
+        - Rules
+      summary: 룰 삭제
+      description: 룰을 삭제합니다.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 삭제됨
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+        '404':
+          description: 룰을 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Rule not found
+
+  /api/forward-logs:
+    get:
+      tags:
+        - ForwardLogs
+      summary: 전달 로그 목록 (페이지네이션)
+      description: 전달 로그를 페이지네이션으로 조회합니다.
+      parameters:
+        - name: emailId
+          in: query
+          description: 이메일 ID 필터
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          description: 전달 상태 필터
+          schema:
+            type: string
+            enum: [pending, success, failed]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        '200':
+          description: 전달 로그 목록
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ForwardLog'
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+
+  /api/stats:
+    get:
+      tags:
+        - Stats
+      summary: 대시보드 통계
+      description: 대시보드용 통계를 반환합니다.
+      responses:
+        '200':
+          description: 통계
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Stats'
+
+components:
+  schemas:
+    EmailSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        mailFrom:
+          type: string
+        rcptTo:
+          type: string
+        remoteIp:
+          type: string
+        messageId:
+          type: string
+          nullable: true
+        subject:
+          type: string
+          nullable: true
+        fromHeader:
+          type: string
+          nullable: true
+        toHeader:
+          type: string
+          nullable: true
+        ccHeader:
+          type: string
+          nullable: true
+        replyTo:
+          type: string
+          nullable: true
+        date:
+          type: string
+          format: date-time
+          nullable: true
+        headers:
+          type: string
+          nullable: true
+          description: JSON 문자열
+        textBody:
+          type: string
+          nullable: true
+        htmlBody:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [received, classified, forwarded, failed, archived]
+        category:
+          type: string
+          nullable: true
+        matchedRule:
+          type: string
+          nullable: true
+        tenantId:
+          type: string
+          format: uuid
+          nullable: true
+        _count:
+          type: object
+          properties:
+            attachments:
+              type: integer
+            forwardLogs:
+              type: integer
+
+    EmailDetail:
+      allOf:
+        - $ref: '#/components/schemas/EmailSummary'
+        - type: object
+          properties:
+            rawMessage:
+              type: string
+            attachments:
+              type: array
+              items:
+                $ref: '#/components/schemas/Attachment'
+            forwardLogs:
+              type: array
+              items:
+                $ref: '#/components/schemas/ForwardLog'
+
+    Attachment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        emailId:
+          type: string
+          format: uuid
+        filename:
+          type: string
+          nullable: true
+        contentType:
+          type: string
+        size:
+          type: integer
+        checksum:
+          type: string
+          nullable: true
+        storagePath:
+          type: string
+          nullable: true
+
+    ForwardLog:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        emailId:
+          type: string
+          format: uuid
+        forwardTo:
+          type: string
+        status:
+          type: string
+          enum: [pending, success, failed]
+        error:
+          type: string
+          nullable: true
+        smtpResponse:
+          type: string
+          nullable: true
+        attempts:
+          type: integer
+          default: 1
+
+    Tenant:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        name:
+          type: string
+        domains:
+          type: array
+          items:
+            type: string
+          description: 도메인 배열 (기본적으로 DB에는 JSON으로 저장)
+        settings:
+          type: string
+          nullable: true
+          description: JSON 문자열
+        enabled:
+          type: boolean
+
+    ClassificationRule:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        priority:
+          type: integer
+          default: 0
+        enabled:
+          type: boolean
+          default: true
+        conditions:
+          type: string
+          description: JSON 배열 문자열 (RuleCondition[])
+        action:
+          type: string
+          enum: [forward, log, archive, reject]
+        forwardTo:
+          type: string
+          nullable: true
+        category:
+          type: string
+          nullable: true
+        tenantId:
+          type: string
+          format: uuid
+          nullable: true
+
+    RuleCondition:
+      type: object
+      properties:
+        field:
+          type: string
+          enum: [subject, from, to, cc, body, header]
+        operator:
+          type: string
+          enum: [contains, notContains, equals, startsWith, endsWith, regex]
+        value:
+          type: string
+        headerName:
+          type: string
+          description: header 필드인 경우 사용
+
+    Stats:
+      type: object
+      properties:
+        totalEmails:
+          type: integer
+        emailsByStatus:
+          type: object
+          properties:
+            received:
+              type: integer
+            classified:
+              type: integer
+            forwarded:
+              type: integer
+            failed:
+              type: integer
+            archived:
+              type: integer
+        emailsToday:
+          type: integer
+        totalTenants:
+          type: integer
+        totalRules:
+          type: integer
+        recentEmails:
+          type: array
+          items:
+            $ref: '#/components/schemas/EmailPreview'
+
+    EmailPreview:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        subject:
+          type: string
+          nullable: true
+        fromHeader:
+          type: string
+          nullable: true
+        status:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+  responses:
+    BadRequest:
+      description: 잘못된 요청
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+    NotFound:
+      description: 리소스를 찾을 수 없음
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+    InternalError:
+      description: 서버 에러
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: Internal server error
+
+security: []
+
+tags:
+  - name: Health
+    description: 헬스 체크 엔드포인트
+  - name: Emails
+    description: 이메일 관련 엔드포인트
+  - name: Tenants
+    description: 테넌트 관련 엔드포인트
+  - name: Rules
+    description: 분류 룰 관련 엔드포인트
+  - name: ForwardLogs
+    description: 전달 로그 관련 엔드포인트
+  - name: Stats
+    description: 통계 엔드포인트
+
+x-servers:
+  - url: http://localhost:3000
+    description: 로컬 개발 서버 (중복 표기)
+
+x-cors:
+  enabled: true

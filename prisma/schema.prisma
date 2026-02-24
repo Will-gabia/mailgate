@@ -1,0 +1,150 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  // SQLite for development. Switch provider + DATABASE_URL for production RDB.
+  // Supported: "sqlite" | "postgresql" | "mysql" | "sqlserver"
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+
+/// Tenant — multi-tenant isolation unit.
+model Tenant {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  name    String  @unique // Human-readable tenant name
+  domains String  // JSON array of domains, e.g. '["example.com","test.com"]'
+  settings String? // Optional JSON settings per tenant
+  enabled Boolean @default(true)
+
+  // Relations
+  emails Email[]
+  rules  ClassificationRule[]
+}
+
+/// Received email log — every inbound message is persisted here.
+model Email {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Envelope
+  mailFrom    String  // SMTP MAIL FROM
+  rcptTo      String  // SMTP RCPT TO (comma-separated if multiple)
+  remoteIp    String  // Sender IP address
+
+  // Parsed headers
+  messageId   String? @unique
+  subject     String?
+  fromHeader  String? // From header (display name + email)
+  toHeader    String? // To header
+  ccHeader    String? // CC header
+  replyTo     String? // Reply-To header
+  date        DateTime?
+  headers     String? // Full headers as JSON
+
+  // Body
+  textBody    String? // Plain text body
+  htmlBody    String? // HTML body
+  rawMessage  String  // Raw RFC822 message (stored for auditing)
+
+  // Classification
+  status      String  @default("received") // received | classified | forwarded | failed | archived
+  category    String? // Classified category
+  matchedRule String? // Which rule matched
+
+
+  // Authentication results
+  dkimResult   String?  // DKIM verification result: "pass" | "fail" | "none" | "error"
+  spfResult    String?  // SPF verification result: "pass" | "fail" | "none" | "softfail" | "error"
+
+  // Auto-tagging
+  keywords     String?  // JSON array of extracted keywords
+  // Relations
+  attachments Attachment[]
+  forwardLogs ForwardLog[]
+
+  // Multi-tenant
+  tenantId  String?
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([category])
+  @@index([createdAt])
+  @@index([mailFrom])
+  @@index([status, createdAt])              // status 필터 + 시간순 정렬 (페이지네이션)
+  @@index([tenantId, status, createdAt])    // 테넌트별 이메일 목록 조회
+}
+
+/// Attachment metadata
+model Attachment {
+  id        String @id @default(uuid())
+  emailId   String
+  email     Email  @relation(fields: [emailId], references: [id], onDelete: Cascade)
+
+  filename    String?
+  contentType String
+  size        Int
+  checksum    String?  // SHA-256 hash
+  storagePath String?  // Where the file is stored on disk
+
+  @@index([emailId])
+}
+
+/// Classification rule — defines how emails are routed.
+model ClassificationRule {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  name        String   @unique // Human-readable rule name
+  description String?
+  priority    Int      @default(0) // Higher = checked first
+  enabled     Boolean  @default(true)
+
+  // Match conditions (JSON-encoded for flexibility)
+  // e.g. { "field": "subject", "operator": "contains", "value": "urgent" }
+  conditions  String   // JSON array of conditions
+
+  matchMode   String   @default("all") // "all" (AND) | "any" (OR)
+  // Action
+  action      String   // "forward" | "log" | "archive" | "reject"
+  forwardTo   String?  // Target email address(es) for forwarding
+  category    String?  // Category tag to assign
+
+  // Multi-tenant
+  tenantId  String?
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([priority])
+  @@index([enabled])
+  @@index([enabled, tenantId, priority])   // 룰 매칭 핫패스 (메일 수신 시 매번 실행)
+}
+
+/// Log of forwarding attempts
+model ForwardLog {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  emailId     String
+  email       Email    @relation(fields: [emailId], references: [id], onDelete: Cascade)
+
+  forwardTo   String
+  status      String   // "success" | "failed" | "pending"
+  error       String?  // Error message if failed
+  smtpResponse String? // Raw SMTP response
+  attempts    Int      @default(1)
+
+  nextRetryAt DateTime? // Next retry time for exponential backoff
+  @@index([emailId])
+  @@index([status])
+}
