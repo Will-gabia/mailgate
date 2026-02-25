@@ -27,7 +27,7 @@ graph TB
 
   SUB_B_RULES --> TECH_B[Tech Mailbox]
 
-  MG --> GLOBAL[Global Rules (spam, malware)]
+  MG --> GLOBAL["Global Rules (spam, malware)"]
   GLOBAL -->|block/reject| Blackhole[(Reject)]
 
   MG -.-> Dashboard[Dashboard for unified monitoring]
@@ -46,8 +46,8 @@ graph TB
   F --> G
   G --> H[evaluate rules sequentially]
   H --> I{match?}
-  I -->|yes| J[execute action (forward/reject/log)]
-  I -->|no| K[default action (catch-all or reject)]
+  I -->|yes| J["execute action (forward/reject/log)"]
+  I -->|no| K["default action (catch-all or reject)"]
   D -->|no| L[load global rules only]
   L --> M[sort by priority desc]
   M --> H

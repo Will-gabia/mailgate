@@ -44,7 +44,7 @@ graph TB
   C --> R3{subject가 '[RESOLVED]' 또는 '[OK]'로 시작하나?}
   R1 -->|예| F1[온콜팀으로 전달]
   R2 -->|예| F2[개발팀 오류함으로 전달]
-  R3 -->|예| F3[보관(Archive)]
+  R3 -->|예| F3["보관(Archive)"]
   C --> R4{from에 'cloudwatch' 포함?}
   R4 -->|예| F4[인프라팀으로 전달]
   C --> F5[기타: 로깅 및 대시보드]

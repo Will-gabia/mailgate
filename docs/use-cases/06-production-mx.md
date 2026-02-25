@@ -10,18 +10,18 @@
 
 ```mermaid
 graph TB
-  DNS["DNS\nMX 레코드"] -->|메일 전달| Internet(Internet)
-  Internet --> LB["Load Balancer / Reverse Proxy\n:25 -> :2525"]
-  subgraph DockerCompose [Docker Compose]
+  DNS["DNS<br/>MX 레코드"] -->|메일 전달| Internet["Internet"]
+  Internet --> LB["Load Balancer / Reverse Proxy<br/>:25 → :2525"]
+  subgraph DockerCompose ["Docker Compose"]
     direction TB
-    MG["mail-gateway\nSMTP :2525\nSTARTTLS\n(Docker)"]
-    API["mail-gateway-api\nAPI + Dashboard :3000"]
-    VOL["mail-data\n(shared volume)"]
+    MG["mail-gateway<br/>SMTP :2525<br/>STARTTLS<br/>(Docker)"]
+    API["mail-gateway-api<br/>API + Dashboard :3000"]
+    VOL["mail-data<br/>(shared volume)"]
   end
   LB --> MG
-  MG -->|분류| Class[Classification]
-  Class -->|포워딩| Relay["Relay SMTP\n(Gmail / SES / Postfix)"]
-  Class -->|아카이브| Archive["Internal Archive\n(mail-data)"]
+  MG -->|분류| Class["Classification"]
+  Class -->|포워딩| Relay["Relay SMTP<br/>(Gmail / SES / Postfix)"]
+  Class -->|아카이브| Archive["Internal Archive<br/>(mail-data)"]
   API --- VOL
   MG --- VOL
 ```
@@ -53,7 +53,7 @@ sequenceDiagram
   Sender->>MG: RCPT TO:<bob@company.com>
   MG-->>Sender: 250 Accepted
   Sender->>MG: DATA
-  MG-->>Sender: 354 End data with <CR><LF>.<CR><LF>
+  MG-->>Sender: 354 End data with CRLF.CRLF
   Sender->>MG: message data
   MG-->>Sender: 250 Queued
 

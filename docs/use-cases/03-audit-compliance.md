@@ -7,7 +7,7 @@
 ```mermaid
 graph LR
   A[내부 메일 서버] -->|SMTP 릴레이| B[Mail Gateway]
-  B --> C[분류(classification)]
+  B --> C["분류(classification)"]
   C -->|민감 내용| D[컴플라이언스 알림 / 차단]
   C -->|정상| E[감사 로그 저장]
   E --> F[(DB: audit trail, rawMessage 보관)]
@@ -28,7 +28,7 @@ graph TB
   R1 -->|매칭| FWD1[컴플라이언스로 전달]
   R2 -->|매칭| FWD2[컴플라이언스로 전달]
   K -->|대외비 매칭| FWD3[컴플라이언스로 전달]
-  K -->|극비 매칭| REJ[메일 거부(차단)]
+  K -->|극비 매칭| REJ["메일 거부(차단)"]
   FWD1 --> DB[(DB: rawMessage 저장)]
   FWD2 --> DB
   FWD3 --> DB

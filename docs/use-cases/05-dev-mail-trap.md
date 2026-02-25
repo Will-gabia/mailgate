@@ -8,10 +8,10 @@
 
 ```mermaid
 graph LR
-  App["Dev/Staging App\n(SMTP → localhost:2525)"] -->|"SMTP → localhost:2525"| MailGateway["Mail Gateway\n(no relay configured)"]
-  MailGateway --> DB["DB storage\n(rawMessage, headers, attachments)"]
-  DB --> Dashboard["Dashboard\n(localhost:3000)\nInspect mails"]
-  MailGateway -.->|"no relay configured, no outbound"| Internet["Internet\n(외부)"]
+  App["Dev/Staging App<br/>(SMTP → localhost:2525)"] -->|"SMTP → localhost:2525"| MailGateway["Mail Gateway<br/>(no relay configured)"]
+  MailGateway --> DB["DB storage<br/>(rawMessage, headers, attachments)"]
+  DB --> Dashboard["Dashboard<br/>(localhost:3000)<br/>Inspect mails"]
+  MailGateway -.->|"no relay configured, no outbound"| Internet["Internet<br/>(외부)"]
   classDef warn fill:#fff0f0,stroke:#ff4d4d
   class MailGateway warn
 ```
@@ -22,13 +22,13 @@ graph LR
 
 ```mermaid
 graph TB
-  A["애플리케이션이 메일 전송 요청"] --> B["SMTP 서버 수신 (localhost:2525)"]
+  A["애플리케이션이 메일 전송 요청"] --> B["SMTP 서버 수신<br/>(localhost:2525)"]
   B --> C["파싱: rawMessage 분해"]
-  C --> D["분류: 룰 적용 (기본: 모든 메일을 로그)\n(모든 룰은 기본적으로 로그 처리)"]
+  C --> D["분류: 룰 적용<br/>(모든 룰은 기본적으로 로그 처리)"]
   D --> E["저장: DB에 rawMessage, headers, attachments 저장"]
-  E --> F["개발자 대시보드에서 조회 (HTML, 첨부, 헤더)"]
+  E --> F["개발자 대시보드에서 조회<br/>(HTML, 첨부, 헤더)"]
   B --> G["포워드 시도"]
-  G --> H["Relay SMTP 미구성 → 전송 불가\n로그: 'Relay SMTP not configured, forwarding disabled'\nverifyTransport() -> false"]
+  G --> H["Relay SMTP 미구성 → 전송 불가<br/>로그: Relay SMTP not configured<br/>verifyTransport → false"]
   H -.->|"forward fails safely"| E
 ```
 

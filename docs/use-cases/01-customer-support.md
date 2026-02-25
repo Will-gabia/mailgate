@@ -10,10 +10,10 @@
 graph LR
   Customer[고객]
   MailGateway[Mail Gateway]
-  Billing[billing@company.com]
-  Tech[tech@company.com]
-  Refund[refund@company.com]
-  General[general@company.com]
+  Billing["billing@company.com"]
+  Tech["tech@company.com"]
+  Refund["refund@company.com"]
+  General["general@company.com"]
   Archive[Archive/Logs]
 
   Customer -->|SMTP| MailGateway
@@ -30,11 +30,11 @@ graph TB
   A[SMTP 수신] --> B[수신자/발신자/IP 검사]
   B --> C[IP 허용 목록 검증]
   C --> D[레이트 제한 검사]
-  D --> E[메시지 파싱 (헤더, 본문, 첨부)]
+  D --> E["메시지 파싱 (헤더, 본문, 첨부)"]
   E --> F[규칙 기반 분류]
   F --> G{룰 매칭 여부}
   G -->|매칭됨| H[우선순위 순으로 룰 평가]
-  H --> I[조건(AND) 검사: subject, from, to, cc, body, header]
+  H --> I["조건(AND) 검사: subject, from, to, cc, body, header"]
   I --> J{조건 충족}
   J -->|예| K[액션 실행: forward / archive / reject]
   J -->|아니오| L[다음 룰로 이동]

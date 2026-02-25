@@ -29,13 +29,13 @@ graph TB
   DM --> T2[Tenant: globex-inc]
   DM --> T3[Unmatched]
 
-  T1 --> R1[Tenant Rules (acme-corp)]
-  T2 --> R2[Tenant Rules (globex-inc)]
+  T1 --> R1["Tenant Rules (acme-corp)"]
+  T2 --> R2["Tenant Rules (globex-inc)"]
   DM --> GR[Global Rules]
 
   R1 --> D1[Destination: acme inboxes / forwarding]
   R2 --> D2[Destination: globex inboxes / forwarding]
-  GR --> DG[Global Actions (spam reject, quarantine)]
+  GR --> DG["Global Actions (spam reject, quarantine)"]
 
   T3 --> GR
   MG -->|logging/metrics| DB[(Metrics/DB)]
@@ -52,7 +52,7 @@ graph TB
   EX --> LU[Lookup tenant by domain]
   LU -->|found| TF[Apply: tenant rules + global rules]
   LU -->|not found| GF[Apply: global rules only]
-  TF --> ACT[Execute actions (forward, archive, reject, log)]
+  TF --> ACT["Execute actions (forward, archive, reject, log)"]
   GF --> ACT
   ACT --> OUT[Deliver / Reject / Archive]
 
