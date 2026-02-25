@@ -41,7 +41,7 @@ graph TB
   B --> C[룰 매칭]
   C --> R1{subject에 'CRITICAL' 포함?}
   C --> R2{from이 '@sentry.io'로 끝나나?}
-  C --> R3{subject가 '[RESOLVED]' 또는 '[OK]'로 시작하나?}
+  C --> R3{"subject가 '[RESOLVED]' 또는 '[OK]'로 시작하나?"}
   R1 -->|예| F1[온콜팀으로 전달]
   R2 -->|예| F2[개발팀 오류함으로 전달]
   R3 -->|예| F3["보관(Archive)"]

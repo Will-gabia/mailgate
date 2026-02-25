@@ -34,7 +34,7 @@ docker compose up -d    # SMTP :2525 / API+대시보드 :3000
 
 ## 프로젝트 구조
 
-```
+```text
 mail-gateway/
 ├── prisma/
 │   ├── schema.prisma              # DB 스키마 정의
@@ -180,6 +180,7 @@ pm2 start dist/index.js --name mail-gateway
 pm2 start dist/worker.js --name mail-worker
 ```
 
+> [!TIP]
 > **프로세스 분리 권장**: 프로덕션 환경에서는 SMTP 수신과 워커를 별도 프로세스로 분리하면, 처리 로직이 수신 처리량에 영향을 주지 않아 최대 수신 성능을 확보할 수 있습니다. pm2 등의 프로세스 관리자로 워커의 무중단 운영을 보장하세요.
 
 ### API 서버 + 대시보드 실행
@@ -356,6 +357,7 @@ SMTP 서버와 별도로 실행되는 REST API 서버와 React 대시보드입�
 | `GET` | `/api/stats` | 대시보드 통계 (totalEmails, emailsByStatus, emailsToday 등) |
 
 
+> [!NOTE]
 > 📖 전체 API 스펙은 [`docs/openapi.yaml`](docs/openapi.yaml) (OpenAPI 3.0.3) 문서를 참조하세요. 요청/응답 스키마, 파라미터 상세, 에러 응답 형식이 포함되어 있습니다.
 
 ### 응답 형식
@@ -525,7 +527,7 @@ npm run cli -- delete urgent-forward
 ## 메일 처리 흐름
 SMTP 수신과 메일 처리가 BullMQ 큐를 통해 비동기로 분리되어 있습니다. SMTP 서버는 수신과 DB 저장만 수행하고, 실제 처리(파싱, 분류, 전달)는 별도 워커 프로세스에서 실행됩니다.
 
-```
+```text
 ━━━ SMTP 서버 프로세스 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 수신 (SMTP)
   │
@@ -580,14 +582,14 @@ BullMQ 큐 등록
   └─ reject   → 거부 처리
 ```
 
-> **룰 액션 상세:**
->
-> | 액션 | 설명 | 이메일 상태 변경 |
-> |---|---|---|
-> | `forward` | `forwardTo`에 지정된 주소로 메일을 SMTP 릴레이를 통해 전달합니다. 전달 결과는 `ForwardLog`에 기록됩니다. | `received` → `forwarded` (성공 시) 또는 `failed` (실패 시) |
-> | `log` | 별도 액션 없이 분류 결과만 기록합니다. 메일은 DB에 보존됩니다. | `received` → `classified` |
-> | `archive` | 메일을 보관 처리합니다. 향후 조회는 가능하지만 전달하지 않습니다. | `received` → `archived` |
-> | `reject` | 메일을 거부 처리합니다. SMTP 세션에서 거부 응답을 반환합니다. | `received` → `classified` |
+**룰 액션 상세:**
+
+| 액션 | 설명 | 이메일 상태 변경 |
+|---|---|---|
+| `forward` | `forwardTo`에 지정된 주소로 메일을 SMTP 릴레이를 통해 전달합니다. 전달 결과는 `ForwardLog`에 기록됩니다. | `received` → `forwarded` (성공 시) 또는 `failed` (실패 시) |
+| `log` | 별도 액션 없이 분류 결과만 기록합니다. 메일은 DB에 보존됩니다. | `received` → `classified` |
+| `archive` | 메일을 보관 처리합니다. 향후 조회는 가능하지만 전달하지 않습니다. | `received` → `archived` |
+| `reject` | 메일을 거부 처리합니다. SMTP 세션에서 거부 응답을 반환합니다. | `received` → `classified` |
 
 ## 상세: Email 상태 값 (status)
 
@@ -853,15 +855,15 @@ npm run db:migrate
 | `keywords` | String? | 자동 추출된 키워드 (JSON 배열 문자열) |
 | `tenantId` | String? | 소속 테넌트 ID |
 
-> **Email 상태 (`status`) 값:**
->
-> | 상태 | 설명 |
-> |---|---|
-> | `received` | SMTP로 수신 완료. 최소 데이터(envelope + rawMessage)만 DB 저장됨. 워커의 파싱/분류 전 |
-> | `classified` | 워커가 파싱 후 분류 룰에 매칭하여 카테고리 지정됨 (액션이 `log`인 경우) |
-> | `forwarded` | 워커가 분류 룰에 따라 지정 주소로 전달 완료 |
-> | `failed` | 워커의 메일 전달 시도 중 오류 발생 |
-> | `archived` | 워커가 분류 룰에 의해 보관 처리됨 |
+**Email 상태 (`status`) 값:**
+
+| 상태 | 설명 |
+|---|---|
+| `received` | SMTP로 수신 완료. 최소 데이터(envelope + rawMessage)만 DB 저장됨. 워커의 파싱/분류 전 |
+| `classified` | 워커가 파싱 후 분류 룰에 매칭하여 카테고리 지정됨 (액션이 `log`인 경우) |
+| `forwarded` | 워커가 분류 룰에 따라 지정 주소로 전달 완료 |
+| `failed` | 워커의 메일 전달 시도 중 오류 발생 |
+| `archived` | 워커가 분류 룰에 의해 보관 처리됨 |
 
 ### Attachment
 
